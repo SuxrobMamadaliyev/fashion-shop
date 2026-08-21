@@ -1,1 +1,133 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Katalog — AURA</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="/css/variables.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/pages.css">
+</head>
+<body>
+
+<header class="topbar">
+  <span class="topbar-title">Katalog</span>
+  <button class="btn-icon" id="filter-btn" aria-label="Filtr"></button>
+</header>
+
+<main class="view">
+  <div class="chip-row" id="category-chips"></div>
+  <div class="product-grid" id="product-grid">
+    <div class="skeleton" style="height:260px"></div>
+    <div class="skeleton" style="height:260px"></div>
+    <div class="skeleton" style="height:260px"></div>
+    <div class="skeleton" style="height:260px"></div>
+  </div>
+</main>
+
+<nav class="navbar" id="navbar"></nav>
+
+<!-- Filter / sort bottom sheet -->
+<div class="sheet-backdrop" id="filter-sheet-backdrop" onclick="closeSheet('filter-sheet')"></div>
+<div class="sheet" id="filter-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">Saralash</span>
+    <button class="btn-icon" onclick="closeSheet('filter-sheet')"></button>
+  </div>
+  <div class="sheet-body">
+    <div class="option-row" id="sort-options">
+      <div class="option-pill" data-sort="">Standart</div>
+      <div class="option-pill" data-sort="price_asc">Narx: pastdan</div>
+      <div class="option-pill" data-sort="price_desc">Narx: yuqoridan</div>
+      <div class="option-pill" data-sort="popular">Mashhur</div>
+    </div>
+    <button class="btn btn-primary btn-block mt-24" onclick="closeSheet('filter-sheet')">Qo'llash</button>
+  </div>
+</div>
+
+<script src="/js/icons.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/product-card.js"></script>
+<script>
+let currentParams = {};
+
+function getUrlParams() {
+  const usp = new URLSearchParams(location.search);
+  const p = {};
+  if (usp.get('category')) p.category = usp.get('category');
+  const filter = usp.get('filter');
+  if (filter === 'new') p.isNew = 'true';
+  if (filter === 'bestseller') p.isBestSeller = 'true';
+  if (filter === 'sale') p.isSale = 'true';
+  return p;
+}
+
+async function loadCatalog() {
+  await initPage('catalog');
+  document.getElementById('filter-btn').innerHTML = icon('filter', 20);
+
+  currentParams = getUrlParams();
+
+  try {
+    const { categories } = await api.getCategories();
+    const chipRow = document.getElementById('category-chips');
+    chipRow.innerHTML =
+      `<div class="chip ${!currentParams.category ? 'active' : ''}" data-cat="">Barchasi</div>` +
+      categories
+        .map((c) => `<div class="chip ${currentParams.category === c._id ? 'active' : ''}" data-cat="${c._id}">${c.name}</div>`)
+        .join('');
+
+    chipRow.querySelectorAll('.chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        chipRow.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+        const catId = chip.getAttribute('data-cat');
+        if (catId) currentParams.category = catId;
+        else delete currentParams.category;
+        loadProducts();
+      });
+    });
+  } catch (e) {}
+
+  document.getElementById('filter-btn').addEventListener('click', () => openSheet('filter-sheet'));
+  enableSheetDrag('filter-sheet');
+
+  document.querySelectorAll('#sort-options .option-pill').forEach((pill) => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('#sort-options .option-pill').forEach((p) => p.classList.remove('active'));
+      pill.classList.add('active');
+      const sort = pill.getAttribute('data-sort');
+      if (sort) currentParams.sort = sort;
+      else delete currentParams.sort;
+      loadProducts();
+    });
+  });
+  document.querySelector('#sort-options .option-pill').classList.add('active');
+
+  loadProducts();
+}
+
+async function loadProducts() {
+  const grid = document.getElementById('product-grid');
+  try {
+    const { products } = await api.getProducts({ ...currentParams, limit: 40 });
+    if (products.length === 0) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">${icon('box',56)}<h3>Mahsulot topilmadi</h3><p>Boshqa filtrlarni sinab ko'ring</p></div>`;
+      return;
+    }
+    grid.innerHTML = products.map(renderProductCard).join('');
+    bindProductCardEvents(grid);
+  } catch (e) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">${icon('box',56)}<h3>Xatolik</h3><p>${e.message}</p></div>`;
+  }
+}
+
+loadCatalog();
+</script>
+</body>
+</html>
 
