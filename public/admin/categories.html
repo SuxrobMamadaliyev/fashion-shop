@@ -1,1 +1,93 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kategoriyalar — AURA Admin</title>
+<link rel="stylesheet" href="/css/variables.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body data-theme="light">
+<script src="/js/icons.js"></script>
+<script src="js/admin-api.js"></script>
+<script src="js/admin-shell.js"></script>
+<script>renderAdminShell('categories', 'Kategoriyalar');</script>
+
+<div class="modal-backdrop" id="cat-modal-backdrop">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <span class="modal-title">Yangi kategoriya</span>
+      <button class="icon-btn" onclick="document.getElementById('cat-modal-backdrop').classList.remove('open')">${''}</button>
+    </div>
+    <form id="cat-form">
+      <label class="field-label">Nomi</label>
+      <input class="field" name="name" required>
+      <label class="field-label mt-16">Rasm</label>
+      <input class="field" name="image" type="file" accept="image/*">
+      <button class="btn btn-primary btn-block mt-24" type="submit">Saqlash</button>
+    </form>
+  </div>
+</div>
+
+<script>
+document.querySelector('#cat-modal-backdrop .icon-btn').innerHTML = icon('x', 18);
+
+async function loadCategoriesPage() {
+  const body = document.getElementById('admin-page-body');
+  body.innerHTML = `
+    <div class="admin-toolbar">
+      <button class="btn btn-primary" id="new-cat-btn">${icon('plus',16)} Yangi kategoriya</button>
+    </div>
+    <div class="admin-table-wrap"><div style="padding:24px"><div class="skeleton" style="height:120px"></div></div></div>
+  `;
+  document.getElementById('new-cat-btn').addEventListener('click', () => {
+    document.getElementById('cat-form').reset();
+    document.getElementById('cat-modal-backdrop').classList.add('open');
+  });
+  await refreshCategoriesTable();
+}
+
+async function refreshCategoriesTable() {
+  try {
+    const { categories } = await adminApi.getCategories();
+    const wrap = document.querySelector('.admin-table-wrap');
+    wrap.innerHTML = `
+      <table class="admin-table">
+        <thead><tr><th></th><th>Nomi</th><th>Slug</th><th></th></tr></thead>
+        <tbody>
+          ${categories.map((c) => `
+            <tr>
+              <td><img src="${c.image || ''}" alt=""></td>
+              <td>${c.name}</td>
+              <td class="text-secondary">${c.slug}</td>
+              <td><button class="icon-btn danger" onclick="deleteCategory('${c._id}')">${icon('trash',16)}</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (e) {}
+}
+
+document.getElementById('cat-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    await adminApi.createCategory(fd);
+    document.getElementById('cat-modal-backdrop').classList.remove('open');
+    await refreshCategoriesTable();
+  } catch (err) { alert(err.message); }
+});
+
+async function deleteCategory(id) {
+  if (!confirm('O\'chirilsinmi?')) return;
+  try { await adminApi.deleteCategory(id); await refreshCategoriesTable(); }
+  catch (e) { alert(e.message); }
+}
+
+loadCategoriesPage();
+</script>
+</body>
+</html>
 
