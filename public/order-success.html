@@ -1,1 +1,55 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Buyurtma qabul qilindi — AURA</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="/css/variables.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/pages.css">
+<style>
+  .success-wrap { display:flex; flex-direction:column; align-items:center; text-align:center; padding: 80px 24px 24px; }
+  .success-icon {
+    width: 92px; height: 92px; border-radius: 50%;
+    background: rgba(52,199,89,0.15); color:#34c759;
+    display:flex; align-items:center; justify-content:center;
+    margin-bottom: 24px; animation: pop 0.5s var(--ease-spring);
+  }
+  @keyframes pop { from{ transform:scale(0.5); opacity:0; } to{ transform:scale(1); opacity:1; } }
+  .success-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+  .order-num { font-size: 16px; font-weight: 700; color: var(--accent); margin: 16px 0 4px; }
+</style>
+</head>
+<body>
+
+<div class="success-wrap">
+  <div class="success-icon" id="check-icon"></div>
+  <div class="success-title">Buyurtmangiz qabul qilindi!</div>
+  <p class="text-secondary">Tez orada operatorlarimiz siz bilan bog'lanadi</p>
+  <div class="order-num" id="order-number"></div>
+  <div class="text-secondary" id="order-total"></div>
+  <button class="btn btn-primary mt-24" style="width:100%" onclick="location.href='profile.html'">Buyurtmalarimni ko'rish</button>
+  <button class="btn btn-ghost mt-16" style="width:100%" onclick="location.href='index.html'">Bosh sahifaga qaytish</button>
+</div>
+
+<script src="/js/icons.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script>
+initTelegram();
+loadPublicSettings();
+document.getElementById('check-icon').innerHTML = icon('check', 44);
+const params = new URLSearchParams(location.search);
+document.getElementById('order-number').textContent = '#' + (params.get('orderNumber') || '');
+const total = params.get('total');
+if (total) {
+  loadPublicSettings().then(() => {
+    document.getElementById('order-total').textContent = formatPrice(Number(total));
+  });
+}
+</script>
+</body>
+</html>
 
