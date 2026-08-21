@@ -1,1 +1,169 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Mahsulot — AURA</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="/css/variables.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/pages.css">
+<style>
+  body { padding-bottom: 100px; }
+  .pd-topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 10; display: flex; justify-content: space-between; padding: calc(env(safe-area-inset-top,0px) + 12px) 16px; }
+</style>
+</head>
+<body>
+
+<div id="content">
+  <div class="skeleton" style="width:100%;aspect-ratio:3/4"></div>
+</div>
+
+<script src="/js/icons.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/product-card.js"></script>
+<script>
+const productId = new URLSearchParams(location.search).get('id');
+let currentProduct = null;
+let selectedSize = '';
+let selectedColor = '';
+
+async function loadProduct() {
+  initTelegram();
+  await Promise.all([bootstrapAuth(), loadPublicSettings()]);
+  await refreshCartBadge();
+
+  if (!productId) {
+    document.getElementById('content').innerHTML = `<div class="empty-state">${icon('box',56)}<h3>Mahsulot topilmadi</h3></div>`;
+    return;
+  }
+
+  try {
+    const { product } = await api.getProduct(productId);
+    currentProduct = product;
+    renderProduct(product);
+  } catch (e) {
+    document.getElementById('content').innerHTML = `<div class="empty-state">${icon('box',56)}<h3>Xatolik</h3><p>${e.message}</p></div>`;
+  }
+}
+
+function renderProduct(p) {
+  selectedSize = p.sizes[0] || '';
+  selectedColor = p.colors[0] || '';
+
+  const images = p.images.length ? p.images : ['/images/placeholder.png'];
+  const stockLabel = p.stock === 0
+    ? `<span class="pd-stock out">Tugagan</span>`
+    : p.stock <= 5
+    ? `<span class="pd-stock low">Faqat ${p.stock} dona qoldi</span>`
+    : `<span class="pd-stock">Mavjud</span>`;
+
+  document.getElementById('content').innerHTML = `
+    <div class="gallery">
+      <div class="pd-topbar">
+        <button class="btn-icon glass" onclick="history.back()">${icon('arrowLeft',20)}</button>
+        <button class="btn-icon glass" id="pd-fav-btn">${icon('heart',20)}</button>
+      </div>
+      <div class="gallery-scroll" id="gallery-scroll">
+        ${images.map((img) => `<img src="${img}" alt="${p.name}">`).join('')}
+      </div>
+      ${images.length > 1 ? `<div class="gallery-dots" id="gallery-dots">${images.map((_, i) => `<div class="gallery-dot ${i===0?'active':''}"></div>`).join('')}</div>` : ''}
+    </div>
+
+    <div class="pd-body view">
+      <div class="pd-name">${p.name}</div>
+      <div class="pd-price-row">
+        <span class="pd-price">${formatPrice(p.price)}</span>
+        ${p.oldPrice ? `<span class="product-old-price">${formatPrice(p.oldPrice)}</span>` : ''}
+        ${p.discount ? `<span class="product-discount">-${p.discount}%</span>` : ''}
+      </div>
+      ${stockLabel}
+
+      ${p.sizes.length ? `
+        <div class="option-label">O'lcham</div>
+        <div class="option-row" id="size-options">
+          ${p.sizes.map((s, i) => `<div class="option-pill ${i===0?'active':''}" data-size="${s}">${s}</div>`).join('')}
+        </div>` : ''}
+
+      ${p.colors.length ? `
+        <div class="option-label">Rang</div>
+        <div class="option-row" id="color-options">
+          ${p.colors.map((c, i) => `<div class="option-pill ${i===0?'active':''}" data-color="${c}">${c}</div>`).join('')}
+        </div>` : ''}
+
+      ${p.description ? `<div class="pd-desc">${p.description}</div>` : ''}
+    </div>
+
+    <div class="pd-sticky-bar">
+      <button class="btn btn-ghost" id="add-cart-btn">${icon('cart',18)} Savatga</button>
+      <button class="btn btn-accent" id="buy-now-btn">Hoziroq sotib olish</button>
+    </div>
+  `;
+
+  wireProductInteractions(p);
+  setupGalleryDots();
+}
+
+function setupGalleryDots() {
+  const scroll = document.getElementById('gallery-scroll');
+  const dots = document.querySelectorAll('#gallery-dots .gallery-dot');
+  if (!scroll || dots.length === 0) return;
+  scroll.addEventListener('scroll', () => {
+    const idx = Math.round(scroll.scrollLeft / scroll.clientWidth);
+    dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+  });
+}
+
+async function wireProductInteractions(p) {
+  document.querySelectorAll('#size-options .option-pill').forEach((pill) => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('#size-options .option-pill').forEach((x) => x.classList.remove('active'));
+      pill.classList.add('active');
+      selectedSize = pill.getAttribute('data-size');
+    });
+  });
+  document.querySelectorAll('#color-options .option-pill').forEach((pill) => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('#color-options .option-pill').forEach((x) => x.classList.remove('active'));
+      pill.classList.add('active');
+      selectedColor = pill.getAttribute('data-color');
+    });
+  });
+
+  await ensureFavoritesCache();
+  const favBtn = document.getElementById('pd-fav-btn');
+  if (favoritesCache.has(String(p._id))) favBtn.classList.add('active');
+  favBtn.addEventListener('click', async () => {
+    const isActive = favBtn.classList.contains('active');
+    favBtn.classList.toggle('active');
+    try {
+      if (isActive) { await api.removeFavorite(p._id); favoritesCache.delete(String(p._id)); }
+      else { await api.addFavorite(p._id); favoritesCache.add(String(p._id)); showToast('Sevimlilarga qo\'shildi'); }
+    } catch (err) { favBtn.classList.toggle('active'); showToast(err.message); }
+  });
+
+  document.getElementById('add-cart-btn').addEventListener('click', async () => {
+    if (p.stock === 0) return showToast('Bu mahsulot tugagan');
+    try {
+      await api.addToCart(p._id, 1, selectedSize, selectedColor);
+      showToast('Savatga qo\'shildi');
+      refreshCartBadge();
+    } catch (err) { showToast(err.message); }
+  });
+
+  document.getElementById('buy-now-btn').addEventListener('click', async () => {
+    if (p.stock === 0) return showToast('Bu mahsulot tugagan');
+    try {
+      await api.addToCart(p._id, 1, selectedSize, selectedColor);
+      location.href = 'checkout.html';
+    } catch (err) { showToast(err.message); }
+  });
+}
+
+loadProduct();
+</script>
+</body>
+</html>
 
