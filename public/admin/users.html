@@ -1,1 +1,56 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foydalanuvchilar — AURA Admin</title>
+<link rel="stylesheet" href="/css/variables.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body data-theme="light">
+<script src="/js/icons.js"></script>
+<script src="js/admin-api.js"></script>
+<script src="js/admin-shell.js"></script>
+<script>renderAdminShell('users', 'Foydalanuvchilar');</script>
+
+<script>
+async function loadUsersPage() {
+  const body = document.getElementById('admin-page-body');
+  body.innerHTML = `<div class="admin-table-wrap"><div style="padding:24px"><div class="skeleton" style="height:200px"></div></div></div>`;
+  try {
+    const { users } = await adminApi.getUsers();
+    const wrap = document.querySelector('.admin-table-wrap');
+    wrap.innerHTML = `
+      <table class="admin-table">
+        <thead><tr><th>Ism</th><th>Username</th><th>Telegram ID</th><th>Buyurtmalar</th><th>Jami xarid</th><th>Holat</th><th></th></tr></thead>
+        <tbody>
+          ${users.map((u) => `
+            <tr>
+              <td>${u.firstName} ${u.lastName || ''}</td>
+              <td>${u.username ? '@'+u.username : '-'}</td>
+              <td class="text-secondary">${u.telegramId}</td>
+              <td>${u.ordersCount}</td>
+              <td>${fmtPriceAdmin(u.totalSpent)}</td>
+              <td><span class="badge" style="background:${u.isBlocked?'rgba(255,59,48,0.15)':'rgba(52,199,89,0.15)'};color:${u.isBlocked?'#ff3b30':'#34c759'}">${u.isBlocked?'Bloklangan':'Faol'}</span></td>
+              <td><button class="icon-btn" onclick="toggleBlock('${u._id}')">${icon(u.isBlocked?'check':'x',16)}</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (e) {
+    body.innerHTML = `<div class="empty-state"><h3>Xatolik</h3><p>${e.message}</p></div>`;
+  }
+}
+
+async function toggleBlock(id) {
+  try { await adminApi.toggleBlockUser(id); await loadUsersPage(); }
+  catch (e) { alert(e.message); }
+}
+
+loadUsersPage();
+</script>
+</body>
+</html>
 
