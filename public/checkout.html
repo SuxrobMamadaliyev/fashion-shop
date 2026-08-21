@@ -1,1 +1,181 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Buyurtma — AURA</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="/css/variables.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/pages.css">
+<style>body{padding-bottom:110px}</style>
+</head>
+<body>
+
+<header class="topbar">
+  <button class="btn-icon" onclick="history.back()">${''}</button>
+  <span class="topbar-title" id="checkout-title">Buyurtma berish</span>
+  <div style="width:44px"></div>
+</header>
+
+<main class="view">
+  <form class="checkout-form" id="checkout-form">
+    <div>
+      <label class="field-label">Ism va familiya</label>
+      <input class="field" name="name" required placeholder="Ism Familiya">
+    </div>
+    <div>
+      <label class="field-label">Telefon raqam</label>
+      <input class="field" name="phone" required placeholder="+998 90 123 45 67" type="tel">
+    </div>
+    <div>
+      <label class="field-label">Viloyat</label>
+      <input class="field" name="region" required placeholder="Toshkent shahri">
+    </div>
+    <div>
+      <label class="field-label">Tuman</label>
+      <input class="field" name="district" required placeholder="Yunusobod tumani">
+    </div>
+    <div>
+      <label class="field-label">Aniq manzil</label>
+      <input class="field" name="addressLine" required placeholder="Ko'cha, uy raqami">
+    </div>
+    <div>
+      <label class="field-label">Izoh (ixtiyoriy)</label>
+      <textarea class="field" name="comment" rows="2" placeholder="Qo'shimcha izoh"></textarea>
+    </div>
+
+    <div>
+      <label class="field-label">Yetkazib berish usuli</label>
+      <div class="method-row" id="delivery-methods">
+        <div class="method-option active" data-value="courier">Kuryer</div>
+        <div class="method-option" data-value="pickup">Olib ketish</div>
+      </div>
+    </div>
+
+    <div>
+      <label class="field-label">To'lov usuli</label>
+      <div class="method-row" id="payment-methods">
+        <div class="method-option active" data-value="cash">Naqd</div>
+        <div class="method-option" data-value="card">Karta</div>
+        <div class="method-option" data-value="click">Click</div>
+        <div class="method-option" data-value="payme">Payme</div>
+      </div>
+    </div>
+  </form>
+
+  <div class="cart-summary" id="order-summary">
+    <div class="skeleton" style="height:60px"></div>
+  </div>
+</main>
+
+<div class="pd-sticky-bar">
+  <button class="btn btn-accent btn-block" id="place-order-btn">Buyurtmani tasdiqlash</button>
+</div>
+
+<script src="/js/icons.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script>
+let deliveryMethod = 'courier';
+let paymentMethod = 'cash';
+
+async function loadCheckout() {
+  initTelegram();
+  document.querySelector('.btn-icon').innerHTML = icon('arrowLeft', 20);
+  await Promise.all([bootstrapAuth(), loadPublicSettings()]);
+
+  try {
+    const { cart } = await api.getCart();
+    if (!cart.items || cart.items.length === 0) {
+      showToast('Savatchangiz bo\'sh');
+      setTimeout(() => location.href = 'cart.html', 800);
+      return;
+    }
+    renderSummary(cart);
+  } catch (e) {
+    showToast(e.message);
+  }
+
+  wireMethodSelectors();
+  document.getElementById('place-order-btn').addEventListener('click', placeOrder);
+}
+
+function renderSummary(cart) {
+  let subtotal = 0;
+  cart.items.forEach((i) => { subtotal += i.product.price * i.quantity; });
+  const deliveryFee = deliveryMethod === 'pickup' ? 0 : ((AppState.settings && AppState.settings.deliveryPrice) || 25000);
+  const total = subtotal + deliveryFee;
+
+  document.getElementById('order-summary').innerHTML = `
+    <div class="summary-row"><span>Mahsulotlar (${cart.items.length})</span><span>${formatPrice(subtotal)}</span></div>
+    <div class="summary-row"><span>Yetkazib berish</span><span>${deliveryFee === 0 ? 'Bepul' : formatPrice(deliveryFee)}</span></div>
+    <div class="summary-row total"><span>Jami</span><span>${formatPrice(total)}</span></div>
+  `;
+}
+
+function wireMethodSelectors() {
+  document.querySelectorAll('#delivery-methods .method-option').forEach((opt) => {
+    opt.addEventListener('click', async () => {
+      document.querySelectorAll('#delivery-methods .method-option').forEach((o) => o.classList.remove('active'));
+      opt.classList.add('active');
+      deliveryMethod = opt.getAttribute('data-value');
+      try {
+        const { cart } = await api.getCart();
+        renderSummary(cart);
+      } catch (e) {}
+    });
+  });
+  document.querySelectorAll('#payment-methods .method-option').forEach((opt) => {
+    opt.addEventListener('click', () => {
+      document.querySelectorAll('#payment-methods .method-option').forEach((o) => o.classList.remove('active'));
+      opt.classList.add('active');
+      paymentMethod = opt.getAttribute('data-value');
+    });
+  });
+}
+
+async function placeOrder() {
+  const form = document.getElementById('checkout-form');
+  const fd = new FormData(form);
+  const name = fd.get('name')?.trim();
+  const phone = fd.get('phone')?.trim();
+  const region = fd.get('region')?.trim();
+  const district = fd.get('district')?.trim();
+  const addressLine = fd.get('addressLine')?.trim();
+  const comment = fd.get('comment')?.trim() || '';
+
+  if (!name || !phone || !region || !district || !addressLine) {
+    showToast('Iltimos, barcha maydonlarni to\'ldiring');
+    return;
+  }
+  if (!/^\+?[0-9]{9,15}$/.test(phone.replace(/[\s\-()]/g, ''))) {
+    showToast('Telefon raqami noto\'g\'ri');
+    return;
+  }
+
+  const btn = document.getElementById('place-order-btn');
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner" style="border-color:rgba(255,255,255,0.3);border-top-color:#fff"></div>`;
+
+  try {
+    const { order } = await api.createOrder({
+      customer: { name, phone },
+      address: { region, district, addressLine, comment },
+      deliveryMethod,
+      paymentMethod,
+    });
+    location.href = `order-success.html?orderNumber=${order.orderNumber}&total=${order.total}`;
+  } catch (e) {
+    showToast(e.message);
+    btn.disabled = false;
+    btn.textContent = 'Buyurtmani tasdiqlash';
+  }
+}
+
+loadCheckout();
+</script>
+</body>
+</html>
 
