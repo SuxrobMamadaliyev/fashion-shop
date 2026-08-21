@@ -1,1 +1,107 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sozlamalar — AURA Admin</title>
+<link rel="stylesheet" href="/css/variables.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body data-theme="light">
+<script src="/js/icons.js"></script>
+<script src="js/admin-api.js"></script>
+<script src="js/admin-shell.js"></script>
+<script>renderAdminShell('settings', 'Sozlamalar');</script>
+
+<script>
+async function loadSettingsPage() {
+  const body = document.getElementById('admin-page-body');
+  body.innerHTML = `<div class="admin-table-wrap"><div style="padding:24px"><div class="skeleton" style="height:300px"></div></div></div>`;
+
+  try {
+    const { settings } = await adminApi.getSettings();
+    const wrap = document.querySelector('.admin-table-wrap');
+    wrap.innerHTML = `
+      <form id="settings-form" style="padding:24px">
+        <div class="form-grid">
+          <div><label class="field-label">Brend nomi</label><input class="field" name="brandName" value="${settings.brandName||''}"></div>
+          <div><label class="field-label">Accent rang</label><input class="field" name="accentColor" type="color" value="${settings.accentColor||'#0a84ff'}" style="height:48px;padding:6px"></div>
+          <div class="full"><label class="field-label">Tavsif</label><textarea class="field" name="description" rows="2">${settings.description||''}</textarea></div>
+          <div><label class="field-label">Telefon</label><input class="field" name="phone" value="${settings.phone||''}"></div>
+          <div><label class="field-label">Telegram</label><input class="field" name="telegram" value="${settings.telegram||''}"></div>
+          <div><label class="field-label">Instagram</label><input class="field" name="instagram" value="${settings.instagram||''}"></div>
+          <div><label class="field-label">Valyuta</label><input class="field" name="currency" value="${settings.currency||'UZS'}"></div>
+          <div><label class="field-label">Yetkazib berish narxi</label><input class="field" name="deliveryPrice" type="number" value="${settings.deliveryPrice||0}"></div>
+          <div><label class="field-label">Minimal buyurtma</label><input class="field" name="minOrderAmount" type="number" value="${settings.minOrderAmount||0}"></div>
+          <div><label class="field-label">Tema</label>
+            <select class="field" name="defaultTheme">
+              <option value="auto" ${settings.defaultTheme==='auto'?'selected':''}>Avtomatik (Telegram)</option>
+              <option value="light" ${settings.defaultTheme==='light'?'selected':''}>Yorug'</option>
+              <option value="dark" ${settings.defaultTheme==='dark'?'selected':''}>Qorong'i</option>
+            </select>
+          </div>
+          <div><label class="field-label">Logo</label><input class="field" name="logo" type="file" accept="image/*"></div>
+          <div><label class="field-label">Favicon</label><input class="field" name="favicon" type="file" accept="image/*"></div>
+        </div>
+        <button class="btn btn-primary mt-24" type="submit">Saqlash</button>
+      </form>
+
+      <div style="padding:0 24px 24px">
+        <div style="font-weight:700;margin-bottom:8px">Majburiy obuna kanallari</div>
+        <p class="text-secondary" style="font-size:13px;margin-bottom:12px">Foydalanuvchilar botdan foydalanish uchun ushbu kanallarga obuna bo'lishlari shart bo'ladi.</p>
+        <div class="chan-list" id="chan-list">
+          ${(settings.mandatoryChannels||[]).map((c) => `
+            <div class="chan-item">
+              <span>${c.title || c.username || c.chatId}</span>
+              <button class="icon-btn danger" onclick="removeChannel('${c.chatId}')">${icon('trash',14)}</button>
+            </div>
+          `).join('') || '<p class="text-tertiary" style="font-size:13px">Hozircha qo\'shilmagan</p>'}
+        </div>
+        <div class="row gap-8 mt-16">
+          <input class="field" id="chan-id" placeholder="Chat ID (masalan -1001234567890)">
+          <input class="field" id="chan-title" placeholder="Nomi">
+          <button class="btn btn-ghost" onclick="addChannel()">${icon('plus',16)}</button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('settings-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true; btn.textContent = 'Saqlanmoqda...';
+      try {
+        await adminApi.updateSettings(fd);
+        alert('Sozlamalar saqlandi');
+      } catch (err) { alert(err.message); }
+      finally { btn.disabled = false; btn.textContent = 'Saqlash'; }
+    });
+  } catch (e) {
+    body.innerHTML = `<div class="empty-state"><h3>Xatolik</h3><p>${e.message}</p></div>`;
+  }
+}
+
+async function addChannel() {
+  const chatId = document.getElementById('chan-id').value.trim();
+  const title = document.getElementById('chan-title').value.trim();
+  if (!chatId) return alert('Chat ID kiriting');
+  try {
+    await adminApi.addChannel({ chatId, title, username: '' });
+    await loadSettingsPage();
+  } catch (e) { alert(e.message); }
+}
+
+async function removeChannel(chatId) {
+  if (!confirm('Kanal o\'chirilsinmi?')) return;
+  try {
+    await adminApi.removeChannel(chatId);
+    await loadSettingsPage();
+  } catch (e) { alert(e.message); }
+}
+
+loadSettingsPage();
+</script>
+</body>
+</html>
 
