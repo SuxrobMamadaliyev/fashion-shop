@@ -1,1 +1,112 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buyurtmalar — AURA Admin</title>
+<link rel="stylesheet" href="/css/variables.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body data-theme="light">
+<script src="/js/icons.js"></script>
+<script src="js/admin-api.js"></script>
+<script src="js/admin-shell.js"></script>
+<script>renderAdminShell('orders', 'Buyurtmalar');</script>
+
+<div class="modal-backdrop" id="order-modal-backdrop">
+  <div class="modal" id="order-modal-content"></div>
+</div>
+
+<script>
+const STATUS_FLOW = ['NEW', 'CONFIRMED', 'PROCESSING', 'SHIPPING', 'DELIVERED', 'CANCELLED'];
+const STATUS_LABELS = { NEW: 'Yangi', CONFIRMED: 'Tasdiqlangan', PROCESSING: 'Jarayonda', SHIPPING: 'Yetkazilmoqda', DELIVERED: 'Yetkazildi', CANCELLED: 'Bekor qilindi' };
+
+async function loadOrdersPage() {
+  const body = document.getElementById('admin-page-body');
+  body.innerHTML = `
+    <div class="admin-toolbar">
+      <select class="field" id="status-filter">
+        <option value="">Barcha holatlar</option>
+        ${STATUS_FLOW.map((s) => `<option value="${s}">${STATUS_LABELS[s]}</option>`).join('')}
+      </select>
+    </div>
+    <div class="admin-table-wrap"><div style="padding:24px"><div class="skeleton" style="height:200px"></div></div></div>
+  `;
+  document.getElementById('status-filter').addEventListener('change', (e) => refreshOrdersTable(e.target.value));
+  await refreshOrdersTable('');
+}
+
+async function refreshOrdersTable(status) {
+  try {
+    const { orders } = await adminApi.getOrders(status);
+    const wrap = document.querySelector('.admin-table-wrap');
+    wrap.innerHTML = `
+      <table class="admin-table">
+        <thead><tr><th>Buyurtma</th><th>Mijoz</th><th>Telefon</th><th>Jami</th><th>Holat</th><th>Sana</th><th></th></tr></thead>
+        <tbody>
+          ${orders.map((o) => `
+            <tr>
+              <td>#${o.orderNumber}</td>
+              <td>${o.customer.name}</td>
+              <td>${o.customer.phone}</td>
+              <td>${fmtPriceAdmin(o.total)}</td>
+              <td>${statusBadgeHtml(o.status)}</td>
+              <td class="text-secondary">${new Date(o.createdAt).toLocaleDateString('uz-UZ')}</td>
+              <td><button class="icon-btn" onclick="openOrderDetail('${o._id}')">${icon('chevronRight',16)}</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (e) {}
+}
+
+async function openOrderDetail(id) {
+  const { order } = await adminApi.getOrder(id);
+  const content = document.getElementById('order-modal-content');
+
+  const nextOptions = STATUS_FLOW.filter((s) => s !== order.status);
+
+  content.innerHTML = `
+    <div class="modal-header">
+      <span class="modal-title">Buyurtma #${order.orderNumber}</span>
+      <button class="icon-btn" onclick="document.getElementById('order-modal-backdrop').classList.remove('open')">${icon('x',18)}</button>
+    </div>
+    <div style="font-size:14px;line-height:1.8">
+      <div><b>Mijoz:</b> ${order.customer.name}</div>
+      <div><b>Telefon:</b> ${order.customer.phone}</div>
+      <div><b>Manzil:</b> ${order.address.region}, ${order.address.district}, ${order.address.addressLine}</div>
+      ${order.address.comment ? `<div><b>Izoh:</b> ${order.address.comment}</div>` : ''}
+      <div><b>To'lov:</b> ${order.paymentMethod} | <b>Yetkazish:</b> ${order.deliveryMethod}</div>
+    </div>
+    <div class="mt-16" style="border-top:1px solid var(--border-glass);padding-top:16px">
+      ${order.products.map((p) => `<div class="row between" style="font-size:13px;padding:4px 0"><span>${p.name} x${p.quantity}${p.size?` (${p.size})`:''}</span><span>${fmtPriceAdmin(p.price*p.quantity)}</span></div>`).join('')}
+      <div class="row between" style="font-weight:800;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-glass)"><span>Jami</span><span>${fmtPriceAdmin(order.total)}</span></div>
+    </div>
+    <div class="mt-24">
+      <label class="field-label">Holatni yangilash</label>
+      <select class="field" id="status-select">
+        <option value="${order.status}" selected>${STATUS_LABELS[order.status]} (joriy)</option>
+        ${nextOptions.map((s) => `<option value="${s}">${STATUS_LABELS[s]}</option>`).join('')}
+      </select>
+      <button class="btn btn-primary btn-block mt-16" onclick="updateStatus('${order._id}')">Yangilash</button>
+    </div>
+  `;
+  document.getElementById('order-modal-backdrop').classList.add('open');
+}
+
+async function updateStatus(orderId) {
+  const status = document.getElementById('status-select').value;
+  try {
+    await adminApi.updateOrderStatus(orderId, status);
+    document.getElementById('order-modal-backdrop').classList.remove('open');
+    await refreshOrdersTable(document.getElementById('status-filter').value);
+  } catch (e) { alert(e.message); }
+}
+
+loadOrdersPage();
+</script>
+</body>
+</html>
 
