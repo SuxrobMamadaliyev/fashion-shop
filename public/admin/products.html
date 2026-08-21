@@ -1,1 +1,174 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mahsulotlar — AURA Admin</title>
+<link rel="stylesheet" href="/css/variables.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body data-theme="light">
+<script src="/js/icons.js"></script>
+<script src="js/admin-api.js"></script>
+<script src="js/admin-shell.js"></script>
+<script>renderAdminShell('products', 'Mahsulotlar');</script>
+
+<div class="modal-backdrop" id="product-modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Yangi mahsulot</span>
+      <button class="icon-btn" onclick="closeProductModal()">${''}</button>
+    </div>
+    <form id="product-form">
+      <input type="hidden" name="_id">
+      <div class="form-grid">
+        <div class="full"><label class="field-label">Nomi</label><input class="field" name="name" required></div>
+        <div class="full"><label class="field-label">Tavsif</label><textarea class="field" name="description" rows="3"></textarea></div>
+        <div><label class="field-label">Narx</label><input class="field" name="price" type="number" min="0" required></div>
+        <div><label class="field-label">Eski narx</label><input class="field" name="oldPrice" type="number" min="0"></div>
+        <div><label class="field-label">Chegirma %</label><input class="field" name="discount" type="number" min="0" max="100"></div>
+        <div><label class="field-label">Ombordagi soni</label><input class="field" name="stock" type="number" min="0" required></div>
+        <div><label class="field-label">SKU</label><input class="field" name="sku" required></div>
+        <div><label class="field-label">Kategoriya</label><select class="field" name="category" id="cat-select" required></select></div>
+        <div class="full"><label class="field-label">O'lchamlar (vergul bilan)</label><input class="field" name="sizes" placeholder="S, M, L, XL"></div>
+        <div class="full"><label class="field-label">Ranglar (vergul bilan)</label><input class="field" name="colors" placeholder="Qora, Oq, Kulrang"></div>
+        <div class="full"><label class="field-label">Rasmlar</label><input class="field" name="images" type="file" multiple accept="image/*"></div>
+        <div class="full row gap-12" style="flex-wrap:wrap">
+          <label class="row gap-8"><input type="checkbox" name="isNew"> Yangi</label>
+          <label class="row gap-8"><input type="checkbox" name="isBestSeller"> Bestseller</label>
+          <label class="row gap-8"><input type="checkbox" name="isSale"> Chegirmada</label>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block mt-24" type="submit">Saqlash</button>
+    </form>
+  </div>
+</div>
+
+<script>
+document.querySelector('#product-modal-backdrop .icon-btn').innerHTML = icon('x', 18);
+
+async function loadProductsPage() {
+  const body = document.getElementById('admin-page-body');
+  body.innerHTML = `
+    <div class="admin-toolbar">
+      <button class="btn btn-primary" id="new-product-btn">${icon('plus',16)} Yangi mahsulot</button>
+    </div>
+    <div class="admin-table-wrap"><div style="padding:24px"><div class="skeleton" style="height:200px"></div></div></div>
+  `;
+  document.getElementById('new-product-btn').addEventListener('click', () => openProductModal());
+
+  await loadCategoryOptions();
+  await refreshProductsTable();
+}
+
+async function loadCategoryOptions() {
+  try {
+    const { categories } = await adminApi.getCategories();
+    const select = document.getElementById('cat-select');
+    select.innerHTML = categories.map((c) => `<option value="${c._id}">${c.name}</option>`).join('');
+  } catch (e) {}
+}
+
+async function refreshProductsTable() {
+  const body = document.getElementById('admin-page-body');
+  try {
+    const { products } = await adminApi.getProducts();
+    const tableWrap = document.querySelector('.admin-table-wrap') || document.createElement('div');
+    tableWrap.className = 'admin-table-wrap';
+    tableWrap.innerHTML = `
+      <table class="admin-table">
+        <thead><tr><th></th><th>Nomi</th><th>SKU</th><th>Narx</th><th>Ombor</th><th>Holat</th><th></th></tr></thead>
+        <tbody>
+          ${products.map((p) => `
+            <tr>
+              <td><img src="${p.images[0] || ''}" alt=""></td>
+              <td>${p.name}</td>
+              <td>${p.sku}</td>
+              <td>${fmtPriceAdmin(p.price)}</td>
+              <td>${p.stock}</td>
+              <td><span class="badge" style="background:${p.status==='published'?'rgba(52,199,89,0.15)':'rgba(161,161,166,0.2)'};color:${p.status==='published'?'#34c759':'#71717a'}">${p.status==='published'?'Faol':'Yashirin'}</span></td>
+              <td>
+                <div class="row gap-8">
+                  <button class="icon-btn" onclick='openProductModal(${JSON.stringify(p).replace(/'/g,"&apos;")})'>${icon('settings',16)}</button>
+                  <button class="icon-btn" onclick="toggleStatus('${p._id}')">${icon('check',16)}</button>
+                  <button class="icon-btn danger" onclick="deleteProduct('${p._id}')">${icon('trash',16)}</button>
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+    if (!tableWrap.parentElement) body.appendChild(tableWrap);
+  } catch (e) {
+    body.innerHTML += `<div class="empty-state"><h3>Xatolik</h3><p>${e.message}</p></div>`;
+  }
+}
+
+function openProductModal(product) {
+  const form = document.getElementById('product-form');
+  form.reset();
+  document.getElementById('modal-title').textContent = product ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot';
+  form._id.value = product ? product._id : '';
+  if (product) {
+    form.name.value = product.name;
+    form.description.value = product.description || '';
+    form.price.value = product.price;
+    form.oldPrice.value = product.oldPrice || '';
+    form.discount.value = product.discount || '';
+    form.stock.value = product.stock;
+    form.sku.value = product.sku;
+    form.sizes.value = (product.sizes || []).join(', ');
+    form.colors.value = (product.colors || []).join(', ');
+    form.category.value = product.category?._id || product.category;
+    form.isNew.checked = !!product.isNew;
+    form.isBestSeller.checked = !!product.isBestSeller;
+    form.isSale.checked = !!product.isSale;
+  }
+  document.getElementById('product-modal-backdrop').classList.add('open');
+}
+function closeProductModal() {
+  document.getElementById('product-modal-backdrop').classList.remove('open');
+}
+
+document.getElementById('product-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const fd = new FormData(form);
+  const id = fd.get('_id');
+  fd.delete('_id');
+
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Saqlanmoqda...';
+
+  try {
+    if (id) await adminApi.updateProduct(id, fd);
+    else await adminApi.createProduct(fd);
+    closeProductModal();
+    await refreshProductsTable();
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Saqlash';
+  }
+});
+
+async function toggleStatus(id) {
+  try { await adminApi.toggleProductStatus(id); await refreshProductsTable(); }
+  catch (e) { alert(e.message); }
+}
+
+async function deleteProduct(id) {
+  if (!confirm('Rostdan ham o\'chirmoqchimisiz?')) return;
+  try { await adminApi.deleteProduct(id); await refreshProductsTable(); }
+  catch (e) { alert(e.message); }
+}
+
+loadProductsPage();
+</script>
+</body>
+</html>
 
