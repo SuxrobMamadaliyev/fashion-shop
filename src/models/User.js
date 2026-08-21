@@ -1,58 +1,24 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 
-const userSchema = new mongoose.Schema({
-  telegramId: {
-    type: Number,
-    required: true,
-    unique: true
+const UserSchema = new mongoose.Schema(
+  {
+    telegramId: { type: String, required: true, unique: true, index: true },
+    firstName: { type: String, default: '' },
+    lastName: { type: String, default: '' },
+    username: { type: String, default: '' },
+    photoUrl: { type: String, default: '' },
+    languageCode: { type: String, default: 'uz' },
+    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    phone: { type: String, default: '' },
+    region: { type: String, default: '' },
+    district: { type: String, default: '' },
+    address: { type: String, default: '' },
+    totalSpent: { type: Number, default: 0 },
+    ordersCount: { type: Number, default: 0 },
+    completedOrdersCount: { type: Number, default: 0 },
+    isBlocked: { type: Boolean, default: false },
   },
-  firstName: String,
-  lastName: String,
-  username: String,
-  phoneNumber: String,
-  email: String,
-  avatar: String,
-  isPremium: {
-    type: Boolean,
-    default: false
-  },
-  isAdmin: {
-    type: Boolean,
-    default: false
-  },
-  language: {
-    type: String,
-    default: 'uz',
-    enum: ['uz', 'en', 'ru']
-  },
-  address: {
-    street: String,
-    city: String,
-    region: String,
-    postalCode: String
-  },
-  preferences: {
-    notifications: { type: Boolean, default: true },
-    newsletter: { type: Boolean, default: false }
-  },
-  totalOrders: {
-    type: Number,
-    default: 0
-  },
-  totalSpent: {
-    type: Number,
-    default: 0
-  },
-  lastActive: Date,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+  { timestamps: true }
+);
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.model('User', UserSchema);
