@@ -1,5 +1,5 @@
 const User = require('../../models/User');
-const { mainMenuKeyboard } = require('../keyboards/mainMenu');
+const { mainMenuKeyboard, isValidWebAppUrl } = require('../keyboards/mainMenu');
 const Settings = require('../../models/Settings');
 
 async function handleStart(ctx) {
@@ -20,6 +20,10 @@ async function handleStart(ctx) {
 
   const settings = (await Settings.findOne({ key: 'main' })) || { brandName: 'AURA' };
   const webAppUrl = process.env.WEBAPP_URL;
+
+  if (!isValidWebAppUrl(webAppUrl)) {
+    console.warn('[Bot] WEBAPP_URL sozlanmagan yoki https:// bilan boshlanmayapti — "Do\'konni ochish" tugmasi vaqtincha ko\'rsatilmaydi.');
+  }
 
   await ctx.reply(
     `👋 Xush kelibsiz, ${tgUser.first_name || 'mehmon'}!\n\n` +
