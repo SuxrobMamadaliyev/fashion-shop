@@ -1,69 +1,48 @@
 const mongoose = require('mongoose');
 
-const orderSchema = new mongoose.Schema({
-  orderId: {
-    type: String,
-    unique: true,
-    required: true
+const OrderItemSchema = new mongoose.Schema(
+  {
+    product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+    name: { type: String, required: true },
+    image: { type: String, default: '' },
+    price: { type: Number, required: true },
+    quantity: { type: Number, required: true, min: 1 },
+    size: { type: String, default: '' },
+    color: { type: String, default: '' },
   },
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  items: [{
-    productId: mongoose.Schema.Types.ObjectId,
-    productName: String,
-    quantity: Number,
-    price: Number,
-    size: String,
-    color: String
-  }],
-  totalPrice: {
-    type: Number,
-    required: true
-  },
-  discount: {
-    type: Number,
-    default: 0
-  },
-  finalPrice: Number,
-  status: {
-    type: String,
-    enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
-    default: 'pending'
-  },
-  paymentStatus: {
-    type: String,
-    enum: ['unpaid', 'paid', 'failed'],
-    default: 'unpaid'
-  },
-  paymentMethod: {
-    type: String,
-    enum: ['payme', 'click', 'cash']
-  },
-  paymentId: String,
-  shippingAddress: {
-    name: String,
-    phone: String,
-    street: String,
-    city: String,
-    region: String,
-    postalCode: String
-  },
-  trackingNumber: String,
-  notes: String,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+  { _id: false }
+);
 
-orderSchema.index({ userId: 1, createdAt: -1 });
-orderSchema.index({ orderId: 1 });
+const OrderSchema = new mongoose.Schema(
+  {
+    orderNumber: { type: String, required: true, unique: true, index: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    telegramUserId: { type: String, required: true, index: true },
+    products: [OrderItemSchema],
+    customer: {
+      name: { type: String, required: true },
+      phone: { type: String, required: true },
+    },
+    address: {
+      region: { type: String, required: true },
+      district: { type: String, required: true },
+      addressLine: { type: String, required: true },
+      comment: { type: String, default: '' },
+    },
+    deliveryMethod: { type: String, enum: ['courier', 'pickup'], default: 'courier' },
+    paymentMethod: { type: String, enum: ['cash', 'card', 'click', 'payme'], default: 'cash' },
+    subtotal: { type: Number, required: true },
+    deliveryFee: { type: Number, required: true, default: 0 },
+    total: { type: Number, required: true },
+    status: {
+      type: String,
+      enum: ['NEW', 'CONFIRMED', 'PROCESSING', 'SHIPPING', 'DELIVERED', 'CANCELLED'],
+      default: 'NEW',
+      index: true,
+    },
+    source: { type: String, enum: ['webapp', 'bot'], default: 'webapp' },
+  },
+  { timestamps: true }
+);
 
-module.exports = mongoose.model('Order', orderSchema);
+module.exports = mongoose.model('Order', OrderSchema);
