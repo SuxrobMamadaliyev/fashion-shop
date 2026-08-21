@@ -1,1 +1,48 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin kirish — AURA</title>
+<link rel="stylesheet" href="/css/variables.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body data-theme="light">
+<div class="login-wrap">
+  <div class="login-card glass-strong card">
+    <h1>AURA Admin</h1>
+    <p class="text-secondary" style="margin-bottom:24px">Boshqaruv paneliga kirish</p>
+    <form id="login-form">
+      <label class="field-label">Login</label>
+      <input class="field" name="username" required autocomplete="username">
+      <label class="field-label mt-16">Parol</label>
+      <input class="field" name="password" type="password" required autocomplete="current-password">
+      <button class="btn btn-primary btn-block mt-24" type="submit">Kirish</button>
+      <p id="login-error" style="color:#ff3b30;font-size:13px;margin-top:12px;display:none"></p>
+    </form>
+  </div>
+</div>
+<script src="/js/icons.js"></script>
+<script src="js/admin-api.js"></script>
+<script>
+if (adminApi.getToken()) location.href = 'index.html';
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  try {
+    const res = await adminApi.login(fd.get('username'), fd.get('password'));
+    adminApi.setToken(res.token);
+    location.href = 'index.html';
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  }
+});
+</script>
+</body>
+</html>
 
