@@ -1,13 +1,18 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-const app = express();
+const express = require('express');
+const path = require('path');
+const cors = require('cors');
+const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
+const xssClean = require('xss-clean');
 
-// Import routes
+const connectDB = require('./config/db');
+const bot = require('./bot/bot');
+const { notFound, errorHandler } = require('./middleware/errorHandler');
+
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
 const categoryRoutes = require('./routes/categories');
@@ -18,36 +23,34 @@ const adminRoutes = require('./routes/admin');
 const settingsRoutes = require('./routes/settings');
 const webhookRoutes = require('./routes/webhook');
 
-// Import middleware
-const errorHandler = require('./middleware/errorHandler');
+const app = express();
 
-// Security middleware
-app.use(helmet());
-app.use(cors());
+// --- Security middleware ---
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // relaxed for Telegram WebApp + Cloudinary images; tighten per-deployment if needed
+    crossOriginEmbedderPolicy: false,
+  })
+);
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+app.use(mongoSanitize());
+app.use(xssClean());
 
-// Rate limiting
-const limiter = rateLimit({
+const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
 });
-app.use(limiter);
+app.use('/api', apiLimiter);
 
-// Body parser
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// --- Static frontend ---
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// Static files
-app.use(express.static('public'));
-
-// Database connection
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB connection error:', err));
-
-// Routes
+// --- API routes ---
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -56,26 +59,51 @@ app.use('/api/favorites', favoriteRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/settings', settingsRoutes);
-app.use('/api/webhook', webhookRoutes);
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date() });
+// --- Telegram webhook endpoint ---
+const webhookPath = `/telegram/webhook/${process.env.BOT_TOKEN || 'no-token'}`;
+app.use(webhookPath, webhookRoutes);
+
+app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
+
+// SPA-style fallback for the admin panel and mini app pages that use client-side routing
+app.get('/admin/*', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'admin', 'index.html'));
 });
 
-// Error handling middleware
+app.use(notFound);
 app.use(errorHandler);
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV}`);
-});
+async function start() {
+  await connectDB();
 
-module.exports = app;
+  app.listen(PORT, () => {
+    console.log(`[Server] Running on port ${PORT}`);
+  });
+
+  if (process.env.USE_WEBHOOK === 'true' && process.env.BASE_URL) {
+    const fullWebhookUrl = `${process.env.BASE_URL}${webhookPath}`;
+    await bot.telegram.setWebhook(fullWebhookUrl);
+    console.log(`[Bot] Webhook set to ${fullWebhookUrl}`);
+  } else {
+    await bot.telegram.deleteWebhook().catch(() => {});
+    bot.launch();
+    console.log('[Bot] Launched in long-polling mode');
+  }
+
+  process.once('SIGINT', () => {
+    bot.stop('SIGINT');
+    process.exit(0);
+  });
+  process.once('SIGTERM', () => {
+    bot.stop('SIGTERM');
+    process.exit(0);
+  });
+}
+
+start().catch((err) => {
+  console.error('[Fatal] Failed to start server:', err);
+  process.exit(1);
+});
