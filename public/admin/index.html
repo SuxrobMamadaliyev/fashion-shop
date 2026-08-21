@@ -1,1 +1,80 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard — AURA Admin</title>
+<link rel="stylesheet" href="/css/variables.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body data-theme="light">
+<script src="/js/icons.js"></script>
+<script src="js/admin-api.js"></script>
+<script src="js/admin-shell.js"></script>
+<script>renderAdminShell('dashboard', 'Dashboard');</script>
+
+<script>
+async function loadDashboard() {
+  const body = document.getElementById('admin-page-body');
+  body.innerHTML = `<div class="admin-grid">${Array(6).fill('<div class="stat-box"><div class="skeleton" style="height:50px"></div></div>').join('')}</div>`;
+
+  try {
+    const { stats } = await adminApi.getStats();
+    body.innerHTML = `
+      <div class="admin-grid">
+        <div class="stat-box"><div class="label">Umumiy savdo</div><div class="value">${fmtPriceAdmin(stats.totalSales)}</div></div>
+        <div class="stat-box"><div class="label">Bugungi savdo</div><div class="value">${fmtPriceAdmin(stats.todaySales)}</div></div>
+        <div class="stat-box"><div class="label">Buyurtmalar</div><div class="value">${stats.ordersCount}</div></div>
+        <div class="stat-box"><div class="label">Foydalanuvchilar</div><div class="value">${stats.usersCount}</div></div>
+        <div class="stat-box"><div class="label">Mahsulotlar</div><div class="value">${stats.productsCount}</div></div>
+        <div class="stat-box"><div class="label">Kam qolgan</div><div class="value">${stats.lowStockCount}</div></div>
+      </div>
+      <div class="admin-table-wrap" style="padding:24px">
+        <div style="font-weight:700;margin-bottom:16px">Oxirgi 14 kunlik savdo</div>
+        <svg id="revenue-chart" width="100%" height="180" viewBox="0 0 700 180" preserveAspectRatio="none"></svg>
+      </div>
+    `;
+    drawRevenueChart(stats.revenueByDay);
+  } catch (e) {
+    body.innerHTML = `<div class="empty-state"><h3>Xatolik</h3><p>${e.message}</p></div>`;
+  }
+}
+
+function drawRevenueChart(data) {
+  const svg = document.getElementById('revenue-chart');
+  if (!data || data.length === 0) {
+    svg.innerHTML = `<text x="350" y="90" text-anchor="middle" fill="var(--text-secondary)" font-size="13">Ma'lumot yo'q</text>`;
+    return;
+  }
+  const max = Math.max(...data.map((d) => d.total), 1);
+  const w = 700, h = 180, pad = 10;
+  const stepX = (w - pad * 2) / Math.max(data.length - 1, 1);
+
+  const points = data.map((d, i) => {
+    const x = pad + i * stepX;
+    const y = h - pad - (d.total / max) * (h - pad * 2);
+    return [x, y];
+  });
+
+  const linePath = points.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(' ');
+  const areaPath = `${linePath} L${points[points.length-1][0]},${h} L${points[0][0]},${h} Z`;
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="${areaPath}" fill="url(#grad)"/>
+    <path d="${linePath}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    ${points.map((p) => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="var(--accent)"/>`).join('')}
+  `;
+}
+
+loadDashboard();
+</script>
+</body>
+</html>
 
