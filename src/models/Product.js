@@ -1,63 +1,28 @@
 const mongoose = require('mongoose');
 
-const productSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true
+const ProductSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    description: { type: String, default: '' },
+    price: { type: Number, required: true, min: 0 },
+    oldPrice: { type: Number, default: 0, min: 0 },
+    discount: { type: Number, default: 0, min: 0, max: 100 },
+    images: [{ type: String }],
+    category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
+    sizes: [{ type: String }],
+    colors: [{ type: String }],
+    stock: { type: Number, default: 0, min: 0 },
+    sku: { type: String, required: true, unique: true },
+    isNew: { type: Boolean, default: false },
+    isBestSeller: { type: Boolean, default: false },
+    isSale: { type: Boolean, default: false },
+    status: { type: String, enum: ['published', 'hidden'], default: 'published' },
+    views: { type: Number, default: 0 },
+    soldCount: { type: Number, default: 0 },
   },
-  description: String,
-  price: {
-    type: Number,
-    required: true
-  },
-  originalPrice: Number,
-  category: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Category'
-  },
-  images: [{
-    url: String,
-    publicId: String
-  }],
-  thumbnail: String,
-  sizes: [String],
-  colors: [String],
-  stock: {
-    type: Number,
-    default: 0
-  },
-  sku: String,
-  rating: {
-    type: Number,
-    default: 0,
-    min: 0,
-    max: 5
-  },
-  reviews: [{
-    userId: mongoose.Schema.Types.ObjectId,
-    rating: Number,
-    comment: String,
-    createdAt: Date
-  }],
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  isFeatured: {
-    type: Boolean,
-    default: false
-  },
-  tags: [String],
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+  { timestamps: true }
+);
 
-productSchema.index({ name: 'text', description: 'text', tags: 'text' });
+ProductSchema.index({ name: 'text', description: 'text' });
 
-module.exports = mongoose.model('Product', productSchema);
+module.exports = mongoose.model('Product', ProductSchema);
