@@ -1,1 +1,94 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Profil — AURA</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="/css/variables.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/pages.css">
+</head>
+<body>
+
+<main class="view" id="profile-content">
+  <div class="profile-header">
+    <div class="skeleton" style="width:84px;height:84px;border-radius:50%"></div>
+  </div>
+</main>
+
+<nav class="navbar" id="navbar"></nav>
+
+<script src="/js/icons.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script>
+async function loadProfile() {
+  await initPage('profile');
+  const user = AppState.user;
+  const content = document.getElementById('profile-content');
+
+  if (!user) {
+    content.innerHTML = `<div class="empty-state">${icon('user',56)}<h3>Xatolik</h3><p>Profil ma'lumotlarini yuklab bo'lmadi</p></div>`;
+    return;
+  }
+
+  const initials = ((user.firstName || '?')[0] || '').toUpperCase();
+  const currentTheme = localStorage.getItem('theme_override') || 'auto';
+
+  content.innerHTML = `
+    <div class="profile-header">
+      <div class="profile-avatar">
+        ${user.photoUrl ? `<img src="${user.photoUrl}" alt="${user.firstName}">` : initials}
+      </div>
+      <div class="profile-name">${user.firstName} ${user.lastName || ''}</div>
+      ${user.username ? `<div class="profile-username">@${user.username}</div>` : ''}
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-value">${user.ordersCount}</div><div class="stat-label">Buyurtmalar</div></div>
+      <div class="stat-card"><div class="stat-value">${user.completedOrdersCount}</div><div class="stat-label">Yakunlangan</div></div>
+      <div class="stat-card"><div class="stat-value" style="font-size:14px">${formatPrice(user.totalSpent)}</div><div class="stat-label">Jami xarid</div></div>
+    </div>
+
+    <div class="menu-list">
+      <a class="menu-item" href="orders.html">${icon('package',20)}<span>Mening buyurtmalarim</span><span class="chev">${icon('chevronRight',18)}</span></a>
+      <a class="menu-item" href="favorites.html">${icon('heart',20)}<span>Sevimlilar</span><span class="chev">${icon('chevronRight',18)}</span></a>
+      <a class="menu-item" href="cart.html">${icon('cart',20)}<span>Savatcha</span><span class="chev">${icon('chevronRight',18)}</span></a>
+    </div>
+
+    <div class="menu-list">
+      <div class="theme-row">
+        <div class="row gap-12">${icon('moon',20)}<span style="font-weight:600;font-size:15px">Qorong'i rejim</span></div>
+        <div class="toggle ${currentTheme === 'dark' ? 'on' : ''}" id="theme-toggle"><div class="toggle-knob"></div></div>
+      </div>
+    </div>
+
+    <div class="menu-list">
+      <a class="menu-item" href="#" id="support-link">${icon('bell',20)}<span>Yordam / Qo'llab-quvvatlash</span><span class="chev">${icon('chevronRight',18)}</span></a>
+    </div>
+  `;
+
+  const toggle = document.getElementById('theme-toggle');
+  toggle.addEventListener('click', () => {
+    const isOn = toggle.classList.toggle('on');
+    setThemeOverride(isOn ? 'dark' : 'light');
+  });
+
+  document.getElementById('support-link').addEventListener('click', (e) => {
+    e.preventDefault();
+    const tg = window.Telegram && window.Telegram.WebApp;
+    const settings = AppState.settings;
+    if (settings && settings.telegram && tg) {
+      tg.openTelegramLink(settings.telegram.startsWith('http') ? settings.telegram : `https://t.me/${settings.telegram.replace('@','')}`);
+    } else {
+      showToast('Yordam uchun admin bilan bog\'laning');
+    }
+  });
+}
+loadProfile();
+</script>
+</body>
+</html>
 
