@@ -1,30 +1,25 @@
 const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const multer = require('multer');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const uploadImage = async (filePath) => {
-  try {
-    const result = await cloudinary.uploader.upload(filePath, {
-      folder: 'fashion-shop',
-      resource_type: 'auto'
-    });
-    return result;
-  } catch (error) {
-    console.error('Cloudinary upload error:', error);
-    throw error;
-  }
-};
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'fashion-shop/products',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [{ width: 1600, crop: 'limit', quality: 'auto' }],
+  },
+});
 
-const deleteImage = async (publicId) => {
-  try {
-    await cloudinary.uploader.destroy(publicId);
-  } catch (error) {
-    console.error('Cloudinary delete error:', error);
-  }
-};
+const upload = multer({
+  storage,
+  limits: { fileSize: 8 * 1024 * 1024 },
+});
 
-module.exports = { uploadImage, deleteImage, cloudinary };
+module.exports = { cloudinary, upload };
